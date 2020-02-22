@@ -57,7 +57,7 @@ class MinesweeperTest
 		16.times do |y|
 			30.times do |x|
 				val=@field[y+1][x+1] 
-				next if val==0 or val==-1 or val==-2
+				next if val<1
 				ad=get_adjacent(y+1,x+1)
 				adj=[]
 				flagged=0
@@ -75,8 +75,8 @@ class MinesweeperTest
 						 if v==-1 and !left_click.include? [z,c]
 							left_click << [z,c]
 						 	self.click(z,c)
-						 	puts "Oppening #{z},#{c} cause of #{y+1},#{x+1} val=#{val} nb=#{nb} flagged=#{flagged}"
-							@field[z][c]=-69
+						 	#puts "Oppening #{z},#{c} cause of #{y+1},#{x+1} val=#{val} nb=#{nb} flagged=#{flagged}"
+							#@field[z][c]=-69
 						 end
 
 					end
@@ -89,7 +89,7 @@ class MinesweeperTest
 					 if v==-1 and !right_click.include? [z,c]
 							right_click << [z,c]
 						 	self.right_click(z,c)
-						 	puts "Flagging #{z},#{c} cause of #{y+1},#{x+1}  val=#{val} nb=#{nb} flagged=#{flagged}"
+						 	#puts "Flagging #{z},#{c} cause of #{y+1},#{x+1}  val=#{val} nb=#{nb} flagged=#{flagged}"
 						 	@field[z][c]=-2
 						 end
 					end
@@ -123,6 +123,25 @@ class MinesweeperTest
 		adjacents.shift
 		return adjacents
 	end
+	def self.get_adj_4(row,column)
+			adjacents=[]
+			adjacents << [row+1,column] if row<16
+			adjacents << [row-1,column] if row>1
+			adjacents << [row,column+1] if column<30
+			adjacents << [row,column-1] if column>1
+			return adjacents
+	end
+	def self.get_clickable_fields(row,column)
+		adj = get_adjacent(row,column)
+		clickable = adj.reject{|z,c| @field[z][c]!=-1}
+		return clickable
+	end
+	def self.count_flags(row,column)
+			adj = get_adjacent(row,column)
+			flags = adj.reject{|z,c| @field[z][c]!=-2}
+			return flags.size
+
+	end
 	def self.represent value
 		#puts value
 		case value
@@ -143,7 +162,44 @@ class MinesweeperTest
 				puts
 			end
 	end
-	
+	def self.heuristic
+		16.times do |y|
+			30.times do |x|
+				 val=@field[y+1][x+1] 
+				 #puts "#{y+1},#{x+1}(#{val})"
+				 next if val<1
+				 clickable = get_clickable_fields(y+1,x+1)
+				 flags_nr=self.count_flags(y+1,x+1)
+				 next if clickable.empty?
+				 adj4 = get_adj_4(y+1,x+1)
+				 adj4.each do |z,c|
+				 	val_adj4=@field[z][c]
+				 	next if val_adj4<1
+				 	#next if val_adj4>val
+				 	clickable_adj4=get_clickable_fields(z,c)
+				 	flags_nr4=self.count_flags(z,c)
+				 	diff=clickable-clickable_adj4
+				 	puts "y=#{y+1},x=#{x+1}(#{val}),r=#{z},c=#{c}(#{val_adj4}), clickable=#{clickable.inspect},clickable_adj4=#{clickable_adj4.inspect},dif=#{diff.inspect}"
+		
+				 	if diff.size==(val-flags_nr-val_adj4+flags_nr4) and diff.size!=0
+				 		diff.each do |t,m| 
+				 			puts "Rc #{t},#{m}"
+				 			self.right_click(t,m) 
+				 		end
+				 	return 1
+				 	elsif val-flags_nr==val_adj4-flags_nr4 and diff.size!=0 and (clickable_adj4-clickable).size==0
+				 		diff.each do |t,m|
+				 			puts "Lc #{t},#{m}"
+				 			self.click(t,m)
+				 		end
+				 	return 1
+				 	end
+				 end
+			end
+		end
+		return nil
+	end
+
 	def self.game
 		begin
 		self.restart
@@ -154,9 +210,11 @@ class MinesweeperTest
 		lc=[]
 		rc=[]
 		lc,rc = self.algorithm
-		#puts "lc"+lc.inspect
-		#puts "rc"+rc.inspect
-		#self.click(rand(16)+1, rand(30)+1) if lc.empty? and rc.empty?
+		 if lc.empty? and rc.empty?
+		 	puts "xd"
+		 	v=self.heuristic
+		 	#self.click(rand(16)+1, rand(30)+1) if v.nil?
+		 end
 =begin
 		if !lc.empty?
 			lc.each do |y,x|
@@ -176,11 +234,26 @@ class MinesweeperTest
 			sleep(9999)
 
 		end
+	rescue 	NoMethodError=>e
+		#sleep(9999)
+		puts "Retry?(y/n)"
+		if gets.chomp=="y"
+			retry
+		else
+			exit
+		end
+
+	rescue Selenium::WebDriver::Error::UnhandledAlertError
+		puts "Retry?(y/n)"
+		if gets.chomp=="y"
+			retry
+		else
+			exit
+		end
+ 		
 	rescue StandardError=>e
 		puts "#{e.inspect}"
 		retry
-	rescue Selenium::WebDriver::Error::UnhandledAlertError
-		sleep(9999)
 		end
 	end
 =begin
